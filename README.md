@@ -141,4 +141,10 @@ Known rev 1 limitations and the planned rev 2 changes are listed at the end of t
 
 ## Licence
 
-Hardware design files in this repository are released under an open-hardware licence — see `LICENSE` (to be added; CERN-OHL-P v2 or similar). Third-party symbols and footprints from the KiCad libraries retain their own licences.
+Copyright © 2026 Pareekshit Sachan.
+
+This source describes Open Hardware and is licensed under the **CERN-OHL-P v2** (`SPDX-License-Identifier: CERN-OHL-P-2.0`). You may redistribute and modify this documentation and make products using it under the terms of the CERN-OHL-P v2 — see [`LICENSE`](LICENSE) or <https://cern.ch/cern-ohl>.
+
+This documentation is distributed WITHOUT ANY EXPRESS OR IMPLIED WARRANTY, INCLUDING OF MERCHANTABILITY, SATISFACTORY QUALITY AND FITNESS FOR A PARTICULAR PURPOSE. Please see the CERN-OHL-P v2 for applicable conditions.
+
+Symbols, footprints and 3D models from the KiCad libraries are used under the [KiCad library licence](https://www.kicad.org/libraries/license/) (CC-BY-SA 4.0 with exception). Datasheets referenced in the design notes remain the property of their manufacturers.

@@ -1,0 +1,22 @@
+# KiCad
+*.kicad_prl
+*-backups/
+_autosave-*
+*.lck
+~*.lck
+fp-info-cache
+*.kicad_pcb-bak
+*.kicad_sch-bak
+*.bak
+*.000
+*.net
+*.dsn
+*.ses
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Scratch
+*.tmp
+/tmp/
