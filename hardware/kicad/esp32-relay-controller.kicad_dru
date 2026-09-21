@@ -1,0 +1,23 @@
+(version 1)
+
+# Relay contact nets are collected into the "RelayContacts" netclass by the
+# pattern  Net-(J*-Pin_*)  in the project file. Rules match on the netclass
+# rather than on net names because KiCad's rule parser does not match net
+# names that contain parentheses (the auto-generated Net-(Jx-Pin_y) form).
+#
+# These limits are for LOW-VOLTAGE (<= 30 V) switched loads. They are NOT a
+# mains insulation rule. For 230 V loads the relay bank needs >= 2.5 mm
+# clearance, a routed slot between the switched side and the controller,
+# and the coil-drive traces moved out of the contact field.
+
+(rule "relay contacts apart from each other"
+  (condition "A.NetClass == 'RelayContacts' && B.NetClass == 'RelayContacts' && A.NetName != B.NetName")
+  (constraint clearance (min 1.0mm)))
+
+(rule "relay contacts to ground pour"
+  (condition "A.NetClass == 'RelayContacts' && B.Type == 'Zone' && B.NetName == 'GND'")
+  (constraint clearance (min 0.5mm)))
+
+(rule "relay contacts to everything else"
+  (condition "A.NetClass == 'RelayContacts' && B.NetClass != 'RelayContacts'")
+  (constraint clearance (min 0.2mm)))
