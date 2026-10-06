@@ -23,10 +23,9 @@ flash size to **16 MB (128 Mb)**, and upload.
 
 Either way the serial monitor runs at **115200 baud**.
 
-> **Upload speed.** `platformio.ini` sets 460800. 921600 fails on this board
-> with `Invalid head of packet` partway through the handshake — the CH340C and
-> the USB-C stub do not reliably carry it. 460800 flashes the 300 kB image in
-> about four seconds.
+> **Upload speed.** `platformio.ini` sets **1500000**, which flashes the 300 kB
+> image in 1.6 s. Note that **921600 fails on this board while 1500000 works** —
+> it is not a speed limit. See [below](#finding-the-ch340c-cannot-express-921600).
 
 ---
 
@@ -158,6 +157,58 @@ has to resynchronise constantly.
 The hardware fix for rev 2 is a 10 kΩ pull-up from RO to 3.3 V, which is what
 most RS-485 reference designs fit for exactly this reason. It is in the
 [rev 2 backlog](../../docs/design-notes.md#rev-2-backlog).
+
+---
+
+## Finding: the CH340C cannot express 921600
+
+`pio run -t upload` at 921600 dies right after the baud change:
+
+```
+Changing baud rate to 921600
+Changed.
+A fatal error occurred: Unable to verify flash chip connection
+  (Invalid head of packet (0xE0): Possible serial noise or corruption.)
+```
+
+"Serial noise" is esptool guessing, and it is wrong. Sweeping the rate shows
+the failures are not above a threshold — they are at *particular* rates:
+
+| Requested | n | Actual | Error | Result |
+|---|---|---|---|---|
+| 115200 | 52 | 115385 | +0.16 % | ok |
+| 230400 | 26 | 230769 | +0.16 % | ok |
+| 460800 | 13 | 461538 | +0.16 % | ok |
+| 576000 | 10 | 600000 | **+4.17 %** | **fails** |
+| 600000 | 10 | 600000 | 0.00 % | ok |
+| 750000 | 8 | 750000 | 0.00 % | ok |
+| 921600 | 7 | 857143 | **−6.99 %** | **fails** |
+| 1000000 | 6 | 1000000 | 0.00 % | ok |
+| 1200000 | 5 | 1200000 | 0.00 % | ok |
+| 1500000 | 4 | 1500000 | 0.00 % | ok |
+
+750000 works and 576000 does not. 1500000 works and 921600 does not. Nothing
+about that is a signal-integrity ceiling.
+
+The CH340C derives its baud rate by dividing a 48 MHz clock through a
+prescaler and an 8-bit divisor. The measured set of working rates is exactly
+**6 000 000 / n** for integer n, which is what you get if the host driver uses
+only the coarse prescaler setting. This board enumerates as
+`/dev/cu.usbserial-*`, i.e. Apple's built-in CH34x driver — WCH's own driver
+names the device `wchusbserial` and may well divide more finely. The 6 MHz/n
+set is therefore a property of this host, not of the board, and the table
+above is worth re-measuring on Linux or with the vendor driver.
+
+Either way the mechanism is plain: 921600 is unreachable, the driver lands on
+857143 instead, and a receiver running 7 % slow samples the last data bit and
+the stop bit in the wrong bit cell. An 8N1 UART tolerates roughly ±2 %. That
+is also why the corrupted byte was `0xE0`: SLIP frames start with `0xC0`
+(`11000000`), and `0xE0` is `11100000` — the same byte with the sampling point
+slipped one cell into the idle-high line.
+
+Practical rule for this board: pick a rate that divides 6 MHz exactly.
+1500000 is the fastest that works and flashes the 300 kB image in 1.6 s,
+against 4.3 s at 460800 — both hash-verified.
 
 ---
 

@@ -45,4 +45,4 @@ static const uint8_t RELAY_GPIO[8] = { 14, 19, 25, 13, 23, 33, 32, 18 };
   That took the count to zero. A 10 kΩ pull-up on RO is in the rev 2 backlog.
 - **The 5 V rail is absent on USB-only power**, so relays, the buzzer and the WS2812B do nothing while you're programming from a laptop. The 3.3 V logic rail works normally.
 - **Module is the 16 MB flash variant** (ESP32-WROOM-32D-N16). Pick a matching partition table — `default_16MB.csv` under PlatformIO, or "16M Flash (3MB APP/9.9MB FATFS)" in the Arduino IDE.
-- **Flash at 460800, not 921600.** The faster rate fails partway through the handshake with `Invalid head of packet`; the CH340C and the USB-C stub do not carry it reliably.
+- **Pick an upload rate that divides 6 MHz exactly** — 1500000, 1000000, 750000, 460800. **921600 and 576000 fail**, and not because they are too fast: 1500000 works and is 1.6× quicker. The CH340C's reachable rates are 6 000 000 / n on this host, so 921600 lands on 857143 instead, 7 % low, and the UART misframes. Details and the measured table are in [`self-test/README.md`](self-test/README.md#finding-the-ch340c-cannot-express-921600).
