@@ -20,3 +20,6 @@ Thumbs.db
 # Scratch
 *.tmp
 /tmp/
+
+# PlatformIO
+.pio/

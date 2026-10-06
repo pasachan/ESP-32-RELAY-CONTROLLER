@@ -82,7 +82,9 @@ esp32-relay-controller/
 │   ├── schematic.pdf
 │   ├── design-notes.md            Design decisions, the review process, and what changed as a result
 │   └── pinout.md                  ESP32 GPIO map, relay ↔ terminal ↔ GPIO table, connector pinouts
-└── firmware/                      (placeholder — pin definitions to get started)
+└── firmware/
+    ├── README.md                  Pin definitions and the gotchas that bite firmware authors
+    └── self-test/                 Bring-up sketch — exercises every component, no libraries needed
 ```
 
 ---
@@ -101,7 +103,7 @@ See [`hardware/fabrication/README.md`](hardware/fabrication/README.md) for gerbe
 
 ## Firmware quick reference
 
-Full map in [`docs/pinout.md`](docs/pinout.md).
+[`firmware/self-test/`](firmware/self-test/) is a bring-up sketch that exercises every fitted component and prints a pass/fail report over USB serial. Run it first on a new board. Full map in [`docs/pinout.md`](docs/pinout.md), gotchas in [`firmware/README.md`](firmware/README.md).
 
 | Function | GPIO | Notes |
 |---|---|---|
@@ -134,6 +136,7 @@ The interesting engineering is in [`docs/design-notes.md`](docs/design-notes.md)
 | Revision | Date | Notes |
 |---|---|---|
 | **Rev 1** | Sep 2026 | Ordered. 0 DRC errors, 0 unconnected nets, all nets verified single-island. |
+| **Rev 1** | Oct 2026 | **Built and brought up.** All eight relays, the buzzer, the WS2812B, both inputs, the RS-485 receiver and the USB programming path work. One firmware-level finding: the MAX3485's RO pin is tri-stated during transmit and has no pull-up, so it needs one enabled in software — [details](firmware/self-test/README.md#finding-ro-floats-during-transmit). |
 
 Known rev 1 limitations and the planned rev 2 changes are listed at the end of the [design notes](docs/design-notes.md#rev-2-backlog).
 

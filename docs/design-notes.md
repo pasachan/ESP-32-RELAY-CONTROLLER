@@ -88,6 +88,12 @@ MAX3485 (3.3 V, half-duplex), with RE̅ and DE tied together on GPIO2.
 
 The connector is 12 V · A · B · GND. Silkscreen matches the netlist.
 
+**RO goes high-impedance during transmit, and rev 1 has no pull-up on it.** Found during bring-up, not design review. Because RE̅ and DE are tied together, enabling the driver also disables the receiver, and a disabled MAX3485 tri-states RO. With no pull-up fitted, GPIO16 floats for the whole of every transmission — ~19 ms for an 18-byte frame at 9600 baud — and the ESP32's UART clocks in phantom bytes from crosstalk off the adjacent DI line. The first board produced about five junk bytes per frame **with nothing attached to J12 and JP1 open**, so they could only be self-generated.
+
+Two things it was not: lengthening the mark hold before dropping DE changed nothing (26 bytes before, 26 after), which rules out a truncated turn-around, and the fail-safe bias is solid — the receiver reads a clean idle high on 20 of 20 samples when the driver is off. Enabling the ESP32's internal pull-up on GPIO16 after `Serial2.begin()` took the count to zero.
+
+So rev 1 is fully usable with one line of firmware, and rev 2 should fit a 10 kΩ pull-up from RO to 3.3 V, which is what most RS-485 reference designs include for exactly this reason.
+
 ## Why the bus carries 12 V, not 3.3 V
 
 The first idea was to put 3.3 V on the field connector so slave boards need no regulator. Three things kill that.
@@ -179,6 +185,7 @@ Nothing here affects rev 1 functioning as designed for low-voltage loads.
 - **Current-limit the 12 V field-bus pin.** A 500 mA–750 mA PPTC in series with J12 pin 1 prevents a shorted cable becoming a sustained fault; a dedicated small buck for the bus would additionally keep the controller from browning out during one. Add an 18 V TVS at the connector while there — the input TVS is upstream of the filter and does not protect this node.
 - **Reorder the field connector to A · B · GND · 12 V** so ground separates the bus pair from the power pin; a one-position wiring slip currently puts 12 V on the RS-485 line and through the SM712.
 - **Move the coil-drive traces out of the relay contact field**, widen contact traces to 2.5–3 mm or go to 2 oz, and add a slot under the relay bank — the pre-requisites for any mains variant.
+- **Fit a 10 kΩ pull-up from MAX3485 RO to 3.3 V.** RO is tri-stated whenever the driver is enabled, so GPIO16 floats during every transmission and the UART receives phantom bytes. Worked around in firmware today; see [above](#rs-485-field-bus).
 - **Add I²C pull-ups (or a header)** — GPIO21/22 are routed but unpopulated after the on-board humidity sensor was dropped for space.
 - **Widen 3.3 V distribution to 0.5 mm**, route D+/D− together on one layer, and put the USB ESD array in-line rather than on a detour.
 - **Silkscreen numbers on all eight relays** (only the four corners are labelled), and clear the remaining silk-over-pad overlaps.
