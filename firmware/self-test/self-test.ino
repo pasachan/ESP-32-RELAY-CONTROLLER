@@ -7,9 +7,15 @@
  *
  *   Serial:  115200 baud, 8N1, over the on-board CH340C (USB-C)
  *
- * Checks that need no operator and no side effects run automatically at boot.
- * Anything that moves, sounds or lights up is on the menu, because only a
- * human can confirm a relay actually clicked.
+ * On boot it flashes the LED, beeps once, and then starts the full sweep by
+ * itself after a five-second countdown - so flashing the board is enough to
+ * test it, with no serial terminal and no commands to remember. Press any key
+ * during the countdown to get the menu instead and drive the tests one at a
+ * time. The report still asks the operator to confirm what they saw, but an
+ * unanswered prompt times out rather than wedging the sketch.
+ *
+ * WARNING: it energises all eight relays on every boot. Don't leave it on a
+ * board wired to loads you care about.
  *
  * ---------------------------------------------------------------------------
  * POWER: apply 12 V to J1 before running the relay, buzzer or LED tests.
@@ -108,7 +114,8 @@ static void mark(CheckIdx i, Result r, const char *note = "") {
  * Small helpers
  * ======================================================================== */
 
-static bool askYesNo();   /* defined under "Serial UI" below */
+/* 1 = yes, 0 = no, -1 = nobody answered. Defined under "Serial UI" below. */
+static int8_t askYesNo(uint16_t timeout_s = 30);
 
 /* Tests that need a human to confirm them ask directly when run on their own,
  * but stay quiet during the full sweep - stopping for a y/n between every
@@ -119,7 +126,9 @@ static bool g_askOperator = true;
 static void confirm(CheckIdx idx, const char *question) {
   if (!g_askOperator) { mark(idx, R_MANUAL, "ran in full sweep"); return; }
   Serial.printf("   %s [y/n]\n", question);
-  mark(idx, askYesNo() ? R_PASS : R_FAIL, "operator confirmed");
+  int8_t a = askYesNo();
+  if (a < 0) mark(idx, R_MANUAL, "ran, unconfirmed");
+  else       mark(idx, a ? R_PASS : R_FAIL, "operator confirmed");
 }
 
 /* Any key during a long test aborts it and drops back to the menu. */
@@ -503,20 +512,65 @@ static void testRs485() {
   else    Serial.println("   nothing received (expected with J12 empty)");
 }
 
+/* The only thing that runs with no terminal attached, so it is deliberately
+ * unmistakable: the LED through three colours and one short beep. See that and
+ * hear it and you know the 5 V rail, the WS2812B and the buzzer are all alive,
+ * without opening a serial port at all. */
+static void bootSignal() {
+  static const uint8_t c[3][3] = { { 60, 0, 0 }, { 0, 60, 0 }, { 0, 0, 60 } };
+  for (uint8_t i = 0; i < 3; i++) { led(c[i][0], c[i][1], c[i][2]); delay(180); }
+  ledOff();
+  digitalWrite(BUZZER_GPIO, HIGH);
+  delay(80);
+  digitalWrite(BUZZER_GPIO, LOW);
+}
+
+/* The sweep starts on its own so that flashing the board is enough to test it.
+ * Returns false if a key arrives, meaning someone is at a terminal and wants
+ * the menu instead. The LED blinks once a second so the countdown is visible
+ * to someone who is only watching the board. */
+static bool countdown(uint8_t seconds) {
+  Serial.printf("\n Full sweep starts in %u s - press any key for the menu.\n ", seconds);
+  for (uint8_t s = seconds; s; s--) {
+    Serial.printf("%u ", s);
+    Serial.flush();
+    led(18, 18, 18);
+    for (uint8_t t = 0; t < 10; t++) {
+      if (t == 1) ledOff();
+      if (Serial.available()) {
+        while (Serial.available()) Serial.read();
+        Serial.println("- cancelled");
+        ledOff();
+        return false;
+      }
+      delay(100);
+    }
+  }
+  ledOff();
+  Serial.println("- starting");
+  return true;
+}
+
 /* ========================================================================
  * Serial UI
  * ======================================================================== */
 
-static bool askYesNo() {
+/* Gives up after a timeout rather than blocking forever. The sweep can start
+ * on its own with no terminal attached, and an unanswered prompt must not
+ * wedge the sketch - it just leaves that check unconfirmed. */
+static int8_t askYesNo(uint16_t timeout_s) {
   while (Serial.available()) Serial.read();
-  for (;;) {
+  uint32_t t0 = millis();
+  while (millis() - t0 < (uint32_t)timeout_s * 1000) {
     if (Serial.available()) {
       char c = (char)Serial.read();
-      if (c == 'y' || c == 'Y') { Serial.println("   -> PASS"); return true;  }
-      if (c == 'n' || c == 'N') { Serial.println("   -> FAIL"); return false; }
+      if (c == 'y' || c == 'Y') { Serial.println("   -> PASS"); return 1; }
+      if (c == 'n' || c == 'N') { Serial.println("   -> FAIL"); return 0; }
     }
     delay(10);
   }
+  Serial.println("   -> no answer, left unconfirmed");
+  return -1;
 }
 
 static const char *resultStr(Result r) {
@@ -583,6 +637,8 @@ static void printBanner() {
                 ESP_ARDUINO_VERSION_MAJOR, ESP_ARDUINO_VERSION_MINOR,
                 ESP_ARDUINO_VERSION_PATCH);
   Serial.println("=========================================================");
+  Serial.println(" This sketch cycles all eight relays on every boot. Don't");
+  Serial.println(" leave it on a board wired to loads you care about.");
 }
 
 static void printMenu() {
@@ -613,7 +669,8 @@ static void runAll() {
   allOutputsOff();
   Serial.println("\n-- Sweep complete ---------------------------------------");
   Serial.println("   Did every stage behave as described above? [y/n]");
-  Result r = askYesNo() ? R_PASS : R_FAIL;
+  int8_t a = askYesNo();
+  Result r = (a < 0) ? R_MANUAL : (a ? R_PASS : R_FAIL);
   mark(CHK_LED,        r, "full sweep");
   mark(CHK_BUZZER,     r, "full sweep");
   mark(CHK_RELAY_EACH, r, "full sweep");
@@ -655,6 +712,12 @@ void setup() {
   Serial.println("       which is fed only from 12 V on J1 - not from USB. On USB");
   Serial.println("       alone those tests pass silently with nothing happening.");
 
+  /* Proof of life for someone watching the board rather than a terminal, then
+   * the sweep starts by itself. Flashing the board is meant to be enough to
+   * test it - needing to know a keystroke is a poor way to greet a new board. */
+  bootSignal();
+
+  if (countdown(5)) runAll();
   printMenu();
 }
 

@@ -29,6 +29,28 @@ Either way the serial monitor runs at **115200 baud**.
 
 ---
 
+## What happens when you flash it
+
+Nothing to type and no serial command to remember. On boot the board:
+
+1. Flashes the status LED red, green, blue and beeps once — proof of life for
+   someone watching the board rather than a terminal. If you see and hear that,
+   the 5 V rail, the WS2812B and the buzzer are all alive.
+2. Runs the passive checks (below) and prints them.
+3. Counts down five seconds, blinking the LED once a second, then **starts the
+   full sweep by itself**.
+
+Press any key during the countdown to get the menu instead and drive the tests
+one at a time. At the end the report asks you to confirm what you saw; if
+nobody answers within 30 s it stops waiting, marks those checks `??` and prints
+the report anyway, so the sketch is usable with no terminal attached at all.
+
+> **It energises all eight relays on every boot.** Fine on a bare board, which
+> is what it is for — but don't leave this firmware on a board wired to loads
+> you care about.
+
+---
+
 ## Applying power
 
 Apply **12 V to J1** before running the relay, buzzer or LED tests.
@@ -41,9 +63,9 @@ happens. That is by design, not a fault.
 
 ---
 
-## What runs by itself
+## Passive checks
 
-These have no side effects, so they run automatically at boot:
+These have no side effects, so they run before the countdown, every boot:
 
 | Check | What a pass proves |
 |---|---|
@@ -61,8 +83,9 @@ are missing, or A and B are swapped or shorted.
 
 ## The menu
 
-Anything that moves, sounds or lights up is on the menu, because only a human
-can confirm that a relay actually clicked.
+Press any key during the boot countdown to land here instead of running the
+sweep. Everything that moves, sounds or lights up is also on the menu
+individually, because only a human can confirm that a relay actually clicked.
 
 ```
 1  WS2812B status LED          6  input monitor (live)
